@@ -1,24 +1,4 @@
-/* -*-  Mode: C++; c-file-style: "gnu"; indent-tabs-mode:nil; -*- */
-/*
- * Copyright (c) 2009 MIRKO BANCHI
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation;
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- *
- * Authors: Mirko Banchi <mk.banchi@gmail.com>
- *          Sebastien Deronne <sebastien.deronne@gmail.com>
- */
-
+#include "ns3/netanim-module.h"
 #include "ns3/core-module.h"
 #include "ns3/network-module.h"
 #include "ns3/applications-module.h"
@@ -27,7 +7,7 @@
 #include "ns3/ipv4-global-routing-helper.h"
 #include "ns3/internet-module.h"
 #include <vector>
-
+#include "time.h"
 
 #define numClients 9 
 #define MAX_GRID 40
@@ -39,6 +19,8 @@ NS_LOG_COMPONENT_DEFINE ("ht-wifi-network");
 
 int main (int argc, char *argv[])
 {
+
+  srand(time(NULL)); // seed random numbers
   bool udp = false;
   double simulationTime = 10; //seconds
   double distance = 20.0; //meters
@@ -47,7 +29,10 @@ int main (int argc, char *argv[])
   int i = 0; //MSC
   int j = 40; // channel width MHz
   int k = 0; // Short Guard Interval
-  
+ 
+
+
+  // replacing parameters above with command line args 
   CommandLine cmd;
   cmd.AddValue ("frequency", "Whether working in the 2.4 or 5.0 GHz band (other values gets rejected)", frequency);
   cmd.AddValue ("distance", "Distance in meters between the station and the access point", distance);
@@ -60,11 +45,17 @@ int main (int argc, char *argv[])
   payloadSize = 1448; //bytes
   Config::SetDefault ("ns3::TcpSocket::SegmentSize", UintegerValue (payloadSize));
 
+
+
+  // declare client nodes
   NodeContainer wifiStaNode;
   wifiStaNode.Create (numClients);
+  
+  // declare access point
   NodeContainer wifiApNode;
   wifiApNode.Create (1);
 
+  // Yans simulator declarations
   YansWifiChannelHelper channel = YansWifiChannelHelper::Default ();
   YansWifiPhyHelper phy = YansWifiPhyHelper::Default ();
   phy.SetChannel (channel.Create ());
@@ -72,6 +63,7 @@ int main (int argc, char *argv[])
   // Set guard interval
   phy.Set ("ShortGuardEnabled", BooleanValue (k));
 
+  
   WifiMacHelper mac;
   WifiHelper wifi;
   if (frequency == 5.0)
@@ -119,9 +111,13 @@ int main (int argc, char *argv[])
 
   positionAlloc->Add (Vector (0.0, 0.0, 0.0));
              
-  for(int z=0; z<numClients; z++)
+
+
+  std::vector<double> PositionArr(2*numClients);
+  for(int p=0; p<2*numClients; p++){PositionArr[p] = (double)rand()*MAX_GRID/(double)RAND_MAX-(MAX_GRID/2.0);}
+  for(int z=0; z<2*numClients; z+=2)
     {
-      positionAlloc->Add (Vector ((double)rand()*MAX_GRID/(double)RAND_MAX-(MAX_GRID/2.0), (double)rand()*MAX_GRID/(double)RAND_MAX-(MAX_GRID/2.0), 0.0));
+      positionAlloc->Add (Vector (PositionArr[z], PositionArr[z+1],0.0));
     } 
 
               
@@ -199,8 +195,26 @@ int main (int argc, char *argv[])
 
 
   Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
-
   Simulator::Stop (Seconds (simulationTime + 1));
+
+
+
+//// net anim/////
+
+AnimationInterface anim("anim1.xml");
+
+anim.SetConstantPosition(wifiApNode.Get(0),0.0,0.0);
+
+  for(int z=0; z<2*numClients; z+=2)
+    {
+      anim.SetConstantPosition(wifiStaNode.Get(z/2),PositionArr[z],PositionArr[z+1]);
+    }
+
+/////////////////
+
+
+
+
   Simulator::Run ();
   Simulator::Destroy ();
 
